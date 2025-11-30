@@ -6,8 +6,8 @@ import hashlib
 # ============================================================
 
 # Taille des nombres premiers (en bits)
-# MODIFIABLE : 16 bits pour les tests, utilisez 2048+ en production
-BITS = 16
+# MODIFIABLE : 16 bits pour les tests, 3072 est la recommandation minimale actuelle pour la sécurité RSA
+BITS = 3072 
 
 # ============================================================
 # FONCTIONS MATHEMATIQUES
@@ -123,7 +123,7 @@ def inverse_modulaire(e, phi):
 # GENERATION DES CLES
 # ============================================================
 
-def creer_cles(bits=16):
+def creer_cles(bits):
     """
     Génère une paire de clés RSA (publique, privée)
     
@@ -240,17 +240,13 @@ def signer(message, cle_privee):
     hash_message = hacher_message(message)
     print(f"Hash du message : {hash_message}\n")
     
-    # IMPORTANT : Réduire le hash modulo n (car SHA-512 produit 512 bits, mais n peut être plus petit)
-    hash_reduit = hash_message % n
-    print(f"Hash réduit mod n : {hash_reduit}\n")
-    
-    # Étape 2 : Signer le hash réduit avec la clé privée (d, n)
+    # Étape 2 : Signer le hash avec la clé privée (d, n)
     # IMMUABLE : Formule signature = hash^d mod n
     # C'est l'inverse du chiffrement : on utilise la clé PRIVÉE pour "chiffrer"
-    signature = pow(hash_reduit, d, n)
+    signature = pow(hash_message, d, n)
     print(f"Signature générée : {signature}\n")
     
-    return signature, hash_reduit
+    return signature, hash_message
 
 
 
@@ -276,26 +272,22 @@ def verifier(message, signature, cle_publique):
     hash_message = hacher_message(message)
     print(f"Hash du message reçu : {hash_message}\n")
     
-    # IMPORTANT : Réduire le hash modulo n (même opération que lors de la signature)
-    hash_reduit = hash_message % n
-    print(f"Hash réduit mod n : {hash_reduit}\n")
-    
     # Étape 2 : "Déchiffrer" la signature avec la clé publique (e, n)
     # IMMUABLE : Formule hash_déchiffré = signature^e mod n
     # On utilise la clé PUBLIQUE pour "déchiffrer" ce qui a été signé avec la clé privée
     hash_dechiffre = pow(signature, e, n)
     print(f"Hash déchiffré de la signature : {hash_dechiffre}\n")
     
-    # Étape 3 : Comparer les hash réduits
+    # Étape 3 : Comparer les deux hash
     # IMMUABLE : Si les hash correspondent, la signature est valide
     # Cela prouve que :
     #   1. Le message n'a pas été modifié (intégrité)
     #   2. La signature provient bien du détenteur de la clé privée (authenticité)
-    if hash_reduit == hash_dechiffre:
-        print("SIGNATURE VALIDE : Le message est authentique et n'a pas été modifié.\n")
+    if hash_message == hash_dechiffre:
+        print("SIGNATURE VALIDE :)\n")
         return True
     else:
-        print("SIGNATURE INVALIDE : Le message a été altéré ou la signature est incorrecte.\n")
+        print("SIGNATURE INVALIDE :(\n")
         return False
 
 
@@ -321,7 +313,7 @@ def main(message):
     # Étape 1 : Créer les clés RSA
     # La clé publique sera partagée avec tout le monde
     # La clé privée doit rester SECRÈTE
-    cle_publique, cle_privee = creer_cles(bits=16)
+    cle_publique, cle_privee = creer_cles(bits=BITS)
     
     print("=" * 60)
     print("               SIGNATURE DU MESSAGE")
