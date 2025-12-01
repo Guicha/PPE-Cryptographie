@@ -6,8 +6,8 @@ import hashlib
 # ============================================================
 
 # Taille des nombres premiers (en bits)
-# MODIFIABLE : 16 bits pour les tests, 3072 est la recommandation minimale actuelle pour la sécurité RSA
-BITS = 3072 
+# MODIFIABLE : 512 bits minimum pour les tests, 3072 est la recommandation minimale actuelle pour la sécurité RSA
+BITS = 3072
 
 # ============================================================
 # FONCTIONS MATHEMATIQUES
