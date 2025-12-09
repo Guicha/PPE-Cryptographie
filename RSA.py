@@ -1,13 +1,14 @@
 import random
 import hashlib
+import time
 
 # ============================================================
 # PARAMÈTRES RSA
 # ============================================================
 
 # Taille des nombres premiers (en bits)
-# MODIFIABLE : 512 bits minimum pour les tests, 3072 est la recommandation minimale actuelle pour la sécurité RSA
-BITS = 3072
+# MODIFIABLE : 16 bits minimum pour les tests, la taille de la clé privé doit être au moins 3072 bits, ce qui est la recommandation minimale actuelle pour la sécurité RSA (Donc 1536 bits pour p et q)
+BITS = 1536
 
 # ============================================================
 # FONCTIONS MATHEMATIQUES
@@ -125,7 +126,7 @@ def inverse_modulaire(e, phi):
 
 def creer_cles(bits):
     """
-    Génère une paire de clés RSA (publique, privée)
+    Génère une paire de clés RSA (publique, privée) et mesure le temps.
     
     Paramètres:
         bits : VARIABLE - Taille des nombres premiers en bits
@@ -133,7 +134,9 @@ def creer_cles(bits):
     Retourne:
         cle_publique : VARIABLE PUBLIQUE - Tuple (e, n)
         cle_privee : VARIABLE SECRÈTE - Tuple (d, n)
+        duration : Temps de génération en secondes
     """
+    start_time = time.perf_counter()
     
     # Étape 1 : Générer deux nombres premiers distincts p et q
     # IMPORTANT : p et q doivent être gardés secrets
@@ -178,10 +181,14 @@ def creer_cles(bits):
     cle_publique = (e, n)
     cle_privee = (d, n)
     
-    print(f"\nClé publique : {cle_publique}")
-    print(f"Clé privée : {cle_privee}\n")
+    end_time = time.perf_counter()
+    duration = end_time - start_time
     
-    return cle_publique, cle_privee
+    print(f"\nClé publique : {cle_publique}")
+    print(f"Clé privée : {cle_privee}")
+    print(f"Taille de la clé (n) : {n.bit_length()} bits\n")
+    
+    return cle_publique, cle_privee, duration
 
 
 
@@ -221,7 +228,7 @@ def hacher_message(message):
 
 def signer(message, cle_privee):
     """
-    Signe un message avec la clé privée RSA
+    Signe un message avec la clé privée RSA et mesure le temps.
     
     Paramètres:
         message : VARIABLE - Le message à signer (string)
@@ -230,7 +237,10 @@ def signer(message, cle_privee):
     Retourne:
         signature : VARIABLE PUBLIQUE - La signature du message
         hash_message : Le hash pour vérification
+        duration : Temps de signature en secondes
     """
+    start_time = time.perf_counter()
+    
     d, n = cle_privee
     
     print(f"Message à signer : '{message}'\n")
@@ -240,19 +250,29 @@ def signer(message, cle_privee):
     hash_message = hacher_message(message)
     print(f"Hash du message : {hash_message}\n")
     
+    # Si n est trop petit (pour les tests), réduire le hash
+    if hash_message >= n:
+        hash_message = hash_message % n
+        print(f"Hash réduit mod n (test avec petites clés) : {hash_message}\n")
+    
     # Étape 2 : Signer le hash avec la clé privée (d, n)
     # IMMUABLE : Formule signature = hash^d mod n
     # C'est l'inverse du chiffrement : on utilise la clé PRIVÉE pour "chiffrer"
     signature = pow(hash_message, d, n)
-    print(f"Signature générée : {signature}\n")
     
-    return signature, hash_message
+    end_time = time.perf_counter()
+    duration = end_time - start_time
+    
+    print(f"Signature générée : {signature}")
+    print(f"Taille de la signature : {signature.bit_length()} bits\n")
+    
+    return signature, hash_message, duration
 
 
 
 def verifier(message, signature, cle_publique):
     """
-    Vérifie la signature d'un message avec la clé publique RSA
+    Vérifie la signature d'un message avec la clé publique RSA et mesure le temps.
     
     Paramètres:
         message : VARIABLE - Le message signé (string)
@@ -260,8 +280,11 @@ def verifier(message, signature, cle_publique):
         cle_publique : VARIABLE PUBLIQUE - Tuple (e, n) où e est l'exposant public
     
     Retourne:
-        bool : True si la signature est valide, False sinon
+        is_valid : bool - True si la signature est valide, False sinon
+        duration : Temps de vérification en secondes
     """
+    start_time = time.perf_counter()
+    
     e, n = cle_publique
     
     print(f"Message reçu : '{message}'")
@@ -270,7 +293,12 @@ def verifier(message, signature, cle_publique):
     # Étape 1 : Hacher le message reçu avec SHA-512
     # IMMUABLE : Doit utiliser la même fonction de hash que pour signer
     hash_message = hacher_message(message)
-    print(f"Hash du message reçu : {hash_message}\n")
+    print(f"Hash SHA-512 du message reçu : {hash_message}\n")
+    
+    # Si n est trop petit (pour les tests), réduire le hash
+    if hash_message >= n:
+        hash_message = hash_message % n
+        print(f"Hash réduit mod n (test avec petites clés) : {hash_message}\n")
     
     # Étape 2 : "Déchiffrer" la signature avec la clé publique (e, n)
     # IMMUABLE : Formule hash_déchiffré = signature^e mod n
@@ -283,12 +311,17 @@ def verifier(message, signature, cle_publique):
     # Cela prouve que :
     #   1. Le message n'a pas été modifié (intégrité)
     #   2. La signature provient bien du détenteur de la clé privée (authenticité)
-    if hash_message == hash_dechiffre:
+    is_valid = (hash_message == hash_dechiffre)
+    
+    end_time = time.perf_counter()
+    duration = end_time - start_time
+    
+    if is_valid:
         print("SIGNATURE VALIDE :)\n")
-        return True
     else:
         print("SIGNATURE INVALIDE :(\n")
-        return False
+    
+    return is_valid, duration
 
 
 
@@ -300,7 +333,7 @@ def verifier(message, signature, cle_publique):
 
 def main(message):
     """
-    Démontre le processus complet de signature RSA
+    Démontre le processus complet de signature RSA avec mesures de performance.
     
     Paramètres:
         message : VARIABLE - Le message à signer
@@ -313,7 +346,7 @@ def main(message):
     # Étape 1 : Créer les clés RSA
     # La clé publique sera partagée avec tout le monde
     # La clé privée doit rester SECRÈTE
-    cle_publique, cle_privee = creer_cles(bits=BITS)
+    cle_publique, cle_privee, gen_time = creer_cles(bits=BITS)
     
     print("=" * 60)
     print("               SIGNATURE DU MESSAGE")
@@ -321,7 +354,7 @@ def main(message):
     
     # Étape 2 : Signer le message avec la clé privée
     # Seul le propriétaire de la clé privée peut créer cette signature
-    signature, hash_original = signer(message, cle_privee)
+    signature, hash_original, sign_time = signer(message, cle_privee)
     
     print("=" * 60)
     print("            VERIFICATION DE LA SIGNATURE")
@@ -329,7 +362,7 @@ def main(message):
     
     # Étape 3 : Vérifier la signature avec la clé publique
     # N'importe qui peut vérifier l'authenticité du message
-    verifier(message, signature, cle_publique)
+    is_valid, verify_time = verifier(message, signature, cle_publique)
     
     # Étape 4 : Test avec un message modifié
     # Démontre que la signature échoue si le message est altéré
@@ -337,10 +370,30 @@ def main(message):
     print("      TEST AVEC UN MESSAGE MODIFIE")
     print("=" * 60 + "\n")
     
-    message_modifie = "Bonjour je deteste les falafels!"
+    message_modifie = "Envoie 5000 euros à ce compte : FR76 9876 5432 1098 7654 3210 987, c'est le compte de Parfait Junior."
     verifier(message_modifie, signature, cle_publique)
+    
+    # ============================================================
+    # RÉSUMÉ DES PERFORMANCES
+    # ============================================================
+    print("=" * 60)
+    print("         RÉSULTATS DES MESURES DE PERFORMANCE")
+    print("=" * 60 + "\n")
+    
+    e, n = cle_publique
+    d, _ = cle_privee
+    
+    print(f"Algorithme              : RSA")
+    print(f"Taille des premiers (p,q): {BITS} bits chacun")
+    print(f"Taille de la clé (n)    : {n.bit_length()} bits")
+    print(f"Taille clé privée (d)   : {d.bit_length()} bits")
+    print(f"Temps de génération     : {gen_time:.6f} secondes")
+    print(f"Temps de signature      : {sign_time:.6f} secondes")
+    print(f"Temps de vérification   : {verify_time:.6f} secondes")
+    print(f"Validité de la signature: {'VALIDE' if is_valid else 'INVALIDE'}")
+    print("=" * 60)
     
 
 
 if __name__ == "__main__":
-    main(message="Bonjour j'aime les falafels!")
+    main(message="Envoie 500 euros à ce compte : FR76 1234 5678 9012 3456 7890 123, c'est le compte de Guy-Charbel.")
