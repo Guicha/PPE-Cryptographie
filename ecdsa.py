@@ -72,6 +72,10 @@ g_point = Point(x, y, secp256k1_curve_config)
 
 
 def sign_message(message, private_key):
+
+    '''
+    Hash du message via l'algorithme SHA-256
+    '''
     if isinstance(message, str):
         message = message.encode('utf-8')
 
@@ -81,19 +85,36 @@ def sign_message(message, private_key):
     hashed_message_hex = hasher.hexdigest()
     hashed_message_int = int(hashed_message_hex, 16)
 
+    '''
+    Calcul du nonce (c'est un nombre aléatoire unique pour cette opération)
+    '''
     k = random.randint(1, n)
+
+    '''
+    Calcul du point r qui est la première partie de la signature
+    r = x1 mod n
+    '''
     r_point = g_point.multiply(k)
     r = r_point.x % n
+
     if r == 0:
         return sign_message(message, private_key)
 
+    
+    '''
+    Calcul de s qui est la deuxième partie de la signature
+    '''
     k_inverse = find_inverse(k, n)
     s = k_inverse * (hashed_message_int + r * private_key) % n
+
     return r, s
 
 
 def verify_signature(signature, message, public_key):
 
+    '''
+    Hash du message via l'algorithme SHA-256
+    '''
     if isinstance(message, str):
         message = message.encode('utf-8')
 
@@ -104,20 +125,42 @@ def verify_signature(signature, message, public_key):
     hashed_message_int = int(hashed_message_hex, 16)
 
     (r, s) = signature
+
+    '''
+    Calcul de u1, premiere partie de la vérification
+    u1 = z * s-1 mod n
+    '''
     s_inverse = find_inverse(s, n)
     u = hashed_message_int * s_inverse % n
+
+    '''
+    Calcul de u2, deuxieme partie de la vérification
+    u2 = r * s-1 mod n
+    '''
     v = r * s_inverse % n
+
+    '''
+    Calcul du point de courbe
+    x1, y1 = u1 * G + u2 * Q
+    '''
     c_point = g_point.multiply(u).add(public_key.multiply(v))
+
+    '''
+    La signature est valide si r (trois =) x1
+    '''
     return c_point.x == r
 
 
 # Tests
-private_key = random.getrandbits(256) # Random 256 bits number
+private_key = random.getrandbits(256) # Nombre aléatoire de 256 bits
 public_key = g_point.multiply(private_key)
-message = "Nahla envoie 500 euros a Khaled" # Legit message
-altered_message = "Nahla envoie 5000 euros a Thomas" # Fake forged message
+message = "Nahla envoie 500 euros a Khaled" # Message légitime
+altered_message = "Nahla envoie 5000 euros a Thomas" # Message altéré
 
 signature = sign_message(message, private_key)
 print('Signature: ', signature)
+print('Base message: ', message)
 print('Base message verification: ', verify_signature(signature, message, public_key))
+print('-------------')
+print('Altered message: ', altered_message)
 print('Altered message verification: ', verify_signature(signature, altered_message, public_key))
