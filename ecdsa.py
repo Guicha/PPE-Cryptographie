@@ -1,239 +1,123 @@
 import random
 import hashlib
-import time
 
-# ============================================================
-# PARAMÈTRES DE LA COURBE Ed25519
-# ============================================================
+def find_inverse(number, modulus):
+    return pow(number, -1, modulus)
 
-PRIME = pow(2, 255) - 19
-A = -1
-D_NUMERATOR = -121665
-D_DENOMINATOR = 121666
-D = (D_NUMERATOR * pow(D_DENOMINATOR, -1, PRIME)) % PRIME
 
-BASE_POINT_X = 15112221349535400772501151409588531511454012693041857206046113283949847762202
-BASE_POINT_Y = 46316835694926478169428394003475163141307993866256225615783033603165251855960
+class Point:
+    def __init__(self, x, y, curve_config):
+        a = curve_config['a']
+        b = curve_config['b']
+        p = curve_config['p']
 
-# Point de base en coordonnées projectives étendues (X, Y, Z, T)
-# x = X/Z, y = Y/Z, xy = T/Z
-# Pour le point de base, Z=1, donc X=x, Y=y, T=x*y
-BASE_POINT_PROJ = (
-    BASE_POINT_X,
-    BASE_POINT_Y,
-    1,
-    (BASE_POINT_X * BASE_POINT_Y) % PRIME
-)
+        if (y ** 2) % p != (x ** 3 + a * x + b) % p:
+            raise Exception("The point is not on the curve")
 
-print("=== CONFIGURATION DE LA COURBE Ed25519 (OPTIMISÉE) ===")
-print(f"Module p (255 bits) : {PRIME}")
-print("Utilisation des coordonnées projectives étendues pour la performance.")
-print("=" * 50)
+        self.x = x
+        self.y = y
+        self.curve_config = curve_config
 
-# ============================================================
-# FONCTIONS MATHEMATIQUES & UTILITAIRES
-# ============================================================
+    def is_equal_to(self, point):
+        return self.x == point.x and self.y == point.y
 
-def message_to_int(message):
-    """Convertit un message en entier."""
-    if isinstance(message, str):
-        message_bytes = message.encode('utf-8')
-    else:
-        message_bytes = message
-    return int.from_bytes(message_bytes, 'big')
+    def add(self, point):
+        p = self.curve_config['p']
 
-def hash_elements(*elements):
-    """Hache une série d'éléments avec SHA-512."""
-    hasher = hashlib.sha512()
-    for element in elements:
-        hasher.update(str(element).encode('utf-8'))
-    return int(hasher.hexdigest(), 16)
+        if self.is_equal_to(point):
+            slope = (3 * point.x ** 2) * find_inverse(2 * point.y, p) % p
+        else:
+            slope = (point.y - self.y) * find_inverse(point.x - self.x, p) % p
 
-# ============================================================
-# ARITHMETIQUE PROJECTIVE (OPTIMISATION)
-# ============================================================
+        x = (slope ** 2 - point.x - self.x) % p
+        y = (slope * (self.x - x) - self.y) % p
+        return Point(x, y, self.curve_config)
 
-def point_add_projective(P1, P2):
-    """
-    Addition de points en coordonnées projectives étendues (X:Y:Z:T).
-    Cette implémentation évite les inversions modulaires coûteuses.
-    """
-    X1, Y1, Z1, T1 = P1
-    X2, Y2, Z2, T2 = P2
-    
-    A = ((Y1 - X1) * (Y2 - X2)) % PRIME
-    B = ((Y1 + X1) * (Y2 + X2)) % PRIME
-    C = (T1 * 2 * D * T2) % PRIME
-    D_val = (2 * Z1 * Z2) % PRIME
-    
-    E = (B - A) % PRIME
-    F = (D_val - C) % PRIME
-    G = (D_val + C) % PRIME
-    H = (B + A) % PRIME
-    
-    X3 = (E * F) % PRIME
-    Y3 = (G * H) % PRIME
-    T3 = (E * H) % PRIME
-    Z3 = (F * G) % PRIME
-    
-    return (X3, Y3, Z3, T3)
+    def multiply(self, times):
+        current_point = self
+        current_coefficient = 1
 
-def point_double_projective(P):
-    """
-    Doublement de point en coordonnées projectives étendues.
-    Plus rapide que l'addition générique.
-    """
-    X1, Y1, Z1, T1 = P
-    
-    A = (X1 * X1) % PRIME
-    B = (Y1 * Y1) % PRIME
-    C = (2 * Z1 * Z1) % PRIME
-    # a = -1, donc a*A = -A
-    D_val = (-A) % PRIME 
-    
-    E = ((X1 + Y1) * (X1 + Y1) - A - B) % PRIME
-    G = (D_val + B) % PRIME
-    F = (G - C) % PRIME
-    H = (D_val - B) % PRIME
-    
-    X3 = (E * F) % PRIME
-    Y3 = (G * H) % PRIME
-    T3 = (E * H) % PRIME
-    Z3 = (F * G) % PRIME
-    
-    return (X3, Y3, Z3, T3)
+        pervious_points = []
+        while current_coefficient < times:
+            # store current point as a previous point
+            pervious_points.append((current_coefficient, current_point))
+            # if we can multiply our current point by 2, do it
+            if 2 * current_coefficient <= times:
+                current_point = current_point.add(current_point)
+                current_coefficient = 2 * current_coefficient
+            # if we can't multiply our current point by 2, let's find the biggest previous point to add to our point
+            else:
+                next_point = self
+                next_coefficient = 1
+                for (previous_coefficient, previous_point) in pervious_points:
+                    if previous_coefficient + current_coefficient <= times:
+                        if previous_point.x != current_point.x:
+                            next_coefficient = previous_coefficient
+                            next_point = previous_point
+                current_point = current_point.add(next_point)
+                current_coefficient = current_coefficient + next_coefficient
 
-def to_affine(P):
-    """
-    Convertit un point projectif (X,Y,Z,T) en affine (x,y).
-    C'est la SEULE opération qui nécessite une inversion modulaire.
-    """
-    X, Y, Z, T = P
-    inv_Z = pow(Z, -1, PRIME)
-    x = (X * inv_Z) % PRIME
-    y = (Y * inv_Z) % PRIME
-    return (x, y)
+        return current_point
 
-def scalar_multiplication(point_proj, scalar):
-    """
-    Multiplication scalaire optimisée (Double-and-Add).
-    Travaille entièrement en coordonnées projectives.
-    """
-    if scalar == 0:
-        return (0, 1, 1, 0) # Point neutre
-    
-    # Point résultant (Neutre au départ)
-    result = (0, 1, 1, 0)
-    
-    # Conversion binaire (suppression du préfixe '0b')
-    bits = bin(scalar)[2:]
-    
-    for bit in bits:
-        result = point_double_projective(result)
-        if bit == '1':
-            result = point_add_projective(result, point_proj)
-            
-    return result
 
-# ============================================================
-# FONCTIONS PRINCIPALES (AVEC MESURES)
-# ============================================================
+secp256k1_curve_config = {
+    'a': 0,
+    'b': 7,
+    'p': 115792089237316195423570985008687907853269984665640564039457584007908834671663
+}
+x = 55066263022277343669578718895168534326250603453777594175500187360389116729240
+y = 32670510020758816978083085130507043184471273380659243275938904335757337482424
+n = 115792089237316195423570985008687907852837564279074904382605163141518161494337
+g_point = Point(x, y, secp256k1_curve_config)
 
-def generate_keypair():
-    """Génère une paire de clés et mesure le temps."""
-    start_time = time.perf_counter()
-    
-    # Clé privée (256 bits)
-    private_key = random.getrandbits(256)
-    private_key = private_key % (PRIME - 1) + 1
-    
-    # Clé publique (Calcul optimisé)
-    public_key_proj = scalar_multiplication(BASE_POINT_PROJ, private_key)
-    public_key = to_affine(public_key_proj)
-    
-    end_time = time.perf_counter()
-    duration = end_time - start_time
-    
-    return private_key, public_key, duration
 
 def sign_message(message, private_key):
-    """Signe un message et mesure le temps."""
-    start_time = time.perf_counter()
-    
-    message_int = message_to_int(message)
-    
-    # Génération déterministe du nonce r
-    r_seed = hash_elements(message_int, private_key, "nonce")
-    r = r_seed % (PRIME - 1) + 1
-    
-    # Calcul de R = r * G (Optimisé)
-    R_proj = scalar_multiplication(BASE_POINT_PROJ, r)
-    R = to_affine(R_proj)
-    
-    # Recalcul de la clé publique (nécessaire pour le hash)
-    pk_proj = scalar_multiplication(BASE_POINT_PROJ, private_key)
-    public_key = to_affine(pk_proj)
-    
-    # Calcul du challenge h
-    h = hash_elements(R[0], R[1], public_key[0], public_key[1], message_int) % PRIME
-    
-    # Calcul de s
-    s = r + h * private_key
-    
-    end_time = time.perf_counter()
-    duration = end_time - start_time
-    
-    return (R, s), duration
+    if isinstance(message, str):
+        message = message.encode('utf-8')
 
-def verify_signature(message, signature, public_key):
-    """Vérifie une signature et mesure le temps."""
-    start_time = time.perf_counter()
-    
-    R, s = signature
-    message_int = message_to_int(message)
-    
-    h = hash_elements(R[0], R[1], public_key[0], public_key[1], message_int) % PRIME
-    
-    # P1 = s * G
-    P1_proj = scalar_multiplication(BASE_POINT_PROJ, s)
-    P1 = to_affine(P1_proj)
-    
-    # P2 = R + h * PubKey
-    # Conversion de PubKey et R en projectif pour l'addition
-    pk_proj = (public_key[0], public_key[1], 1, (public_key[0]*public_key[1])%PRIME)
-    R_proj = (R[0], R[1], 1, (R[0]*R[1])%PRIME)
-    
-    h_times_pk_proj = scalar_multiplication(pk_proj, h)
-    P2_proj = point_add_projective(R_proj, h_times_pk_proj)
-    P2 = to_affine(P2_proj)
-    
-    is_valid = (P1[0] == P2[0]) and (P1[1] == P2[1])
-    
-    end_time = time.perf_counter()
-    duration = end_time - start_time
-    
-    return is_valid, duration
+    hasher = hashlib.sha256()
+    hasher.update(message)
 
-# ============================================================
-# EXECUTION ET AFFICHAGE DES RESULTATS
-# ============================================================
+    hashed_message_hex = hasher.hexdigest()
+    hashed_message_int = int(hashed_message_hex, 16)
 
-if __name__ == "__main__":
-    print("\n=== RÉSULTATS DES MESURES DE PERFORMANCE ===")
-    
-    # 1. Génération de clés
-    private_key, public_key, gen_time = generate_keypair()
-    print(f"Taille de la clé privée : {private_key.bit_length()} bits")
-    print(f"Temps de génération     : {gen_time:.6f} secondes")
-    
-    # 2. Signature
-    message = "Test de performance cryptographique"
-    signature, sign_time = sign_message(message, private_key)
-    print(f"Temps de signature      : {sign_time:.6f} secondes")
-    
-    # 3. Vérification
-    is_valid, verify_time = verify_signature(message, signature, public_key)
-    print(f"Temps de vérification   : {verify_time:.6f} secondes")
-    print(f"Validité de la signature: {'VALIDE' if is_valid else 'INVALIDE'}")
-    
-    print("=" * 50)
+    k = random.randint(1, n)
+    r_point = g_point.multiply(k)
+    r = r_point.x % n
+    if r == 0:
+        return sign_message(message, private_key)
+
+    k_inverse = find_inverse(k, n)
+    s = k_inverse * (hashed_message_int + r * private_key) % n
+    return r, s
+
+
+def verify_signature(signature, message, public_key):
+
+    if isinstance(message, str):
+        message = message.encode('utf-8')
+
+    hasher = hashlib.sha256()
+    hasher.update(message)
+
+    hashed_message_hex = hasher.hexdigest()
+    hashed_message_int = int(hashed_message_hex, 16)
+
+    (r, s) = signature
+    s_inverse = find_inverse(s, n)
+    u = hashed_message_int * s_inverse % n
+    v = r * s_inverse % n
+    c_point = g_point.multiply(u).add(public_key.multiply(v))
+    return c_point.x == r
+
+
+# Tests
+private_key = random.getrandbits(256) # Random 256 bits number
+public_key = g_point.multiply(private_key)
+message = "Nahla envoie 500 euros a Khaled" # Legit message
+altered_message = "Nahla envoie 5000 euros a Thomas" # Fake forged message
+
+signature = sign_message(message, private_key)
+print('Signature: ', signature)
+print('Base message verification: ', verify_signature(signature, message, public_key))
+print('Altered message verification: ', verify_signature(signature, altered_message, public_key))
