@@ -1,0 +1,12 @@
+﻿=== ECDSA HARDENED: ANALYSE DES AMELIORATIONS ===
+Signature valide: True
+[Fix 1] Nonce deterministic RFC6979 stable sur meme message: True
+[Fix 1] Nonce differents sur messages differents: True
+[Fix 2] Leaky op count faible Hamming weight: 382
+[Fix 2] Leaky op count forte Hamming weight: 510
+[Fix 2] Hardened op count fixe: 816
+[Fix 3] Signature forgee (0,0) acceptee: False
+[Perf] Sign avg (s): 0.02184
+[Perf] Verify avg (s): 0.041086
+[Perf] Sign min/max (s): 0.018716 0.032069
+[Perf] Verify min/max (s): 0.033454 0.061615

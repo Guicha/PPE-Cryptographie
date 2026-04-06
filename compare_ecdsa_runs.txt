@@ -1,0 +1,24 @@
+﻿=== COMPARAISON RUN ECDSA CLASSIQUE vs AMELIORE ===
+Iterations benchmark: 10
+
+[SECURITE]
+Classic - cle privee retrouvee via nonce reuse: True
+Classic - nonce reconstruit via SPA: True
+Classic - cle privee retrouvee via SPA: True
+Classic - signature forgee (0,0) acceptee en mode vulnerable: True
+Hardened - nonce RFC6979 stable sur meme message: True
+Hardened - nonce RFC6979 different sur messages differents: True
+Hardened - signature forgee (0,0) acceptee: False
+
+[SIDE-CHANNEL OP PROFILE]
+Leaky ops faible Hamming weight: 382
+Leaky ops forte Hamming weight: 510
+Hardened ops fixes: 816
+
+[PERFORMANCE]
+Classic sign avg (s): 0.011774
+Classic verify avg (s): 0.024121
+Hardened sign avg (s): 0.020517
+Hardened verify avg (s): 0.039070
+Sign overhead hardened/classic: 1.74x
+Verify overhead hardened/classic: 1.62x
