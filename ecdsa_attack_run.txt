@@ -1,0 +1,19 @@
+﻿
+=== SCENARIO 1: Reutilisation du nonce ===
+Signature 1: (78427568507878867998084369673120801689442523437532078944436852337318340749478, 19547723923232843849637087394548054907357215346123570505434198323282489277938)
+Signature 2: (78427568507878867998084369673120801689442523437532078944436852337318340749478, 31145012709060416852225114676989419682201768881960432354771534667386936547898)
+Meme r entre les deux signatures: True
+Nonce retrouve correct: True
+Cle privee retrouvee: True
+Verification legitime apres attaque: True
+
+=== SCENARIO 2: Canal auxiliaire SPA (simulation) ===
+Longueur trace (ops): 379
+Apercu trace (40 premieres ops): DDADDADDADDDADDADADDADADDDDDDADDADDDADDA
+Nonce reconstruit depuis trace: True
+Cle privee retrouvee depuis nonce expose: True
+
+=== SCENARIO 3: Omission des bornes (Psychic-style) ===
+Signature forgee: (0, 0)
+Verifier vulnerable accepte (attendu=True): True
+Verifier strict accepte (attendu=False): False
