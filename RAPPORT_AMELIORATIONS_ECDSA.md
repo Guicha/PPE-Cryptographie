@@ -130,6 +130,42 @@ Interpretation:
 | Side-channel | profil variable selon bits | ladder fixe + scalar blinding |
 | Verification | depend de l implementation | bornes strictes + validation cle publique |
 
+## Sources
+
+### Standards et specifications
+
+1. RFC 6979 - Deterministic Usage of DSA and ECDSA
+	https://datatracker.ietf.org/doc/html/rfc6979
+2. FIPS 186-5 - Digital Signature Standard (DSS)
+	https://csrc.nist.gov/publications/detail/fips/186/5/final
+3. SEC 1 v2.0 - Elliptic Curve Cryptography
+	https://www.secg.org/sec1-v2.pdf
+
+### Side-channel et contre-mesures
+
+1. Kocher et al. - Differential Power Analysis (CRYPTO 1999)
+	https://www.iacr.org/cryptodb/data/paper.php?pubkey=1471
+2. Coron - Resistance Against Differential Power Analysis for ECC (CHES 1999)
+	https://www.iacr.org/cryptodb/data/paper.php?pubkey=660
+3. NIST SP 800-56A Rev. 3
+	https://csrc.nist.gov/publications/detail/sp/800-56a/rev-3/final
+
+### Validation des signatures et faille Psychic Signatures
+
+1. CVE-2022-21449
+	https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2022-21449
+2. Oracle Critical Patch Update Advisory (April 2022)
+	https://www.oracle.com/security-alerts/cpuapr2022.html
+3. Neil Madden - Psychic Signatures in Java
+	https://neilmadden.blog/2022/04/19/psychic-signatures-in-java/
+
+### Sources experimentales de ce rapport
+
+1. Run attaques (version classique): `ecdsa_attack_run.txt`
+2. Run version amelioree: `ecdsa_hardened_run.txt`
+3. Run comparatif classique vs ameliore: `compare_ecdsa_runs.txt`
+4. Script de comparaison: `compare_ecdsa_runs.py`
+
 ## Recommandations production
 
 1. Conserver RFC6979 comme politique nonce par defaut.
